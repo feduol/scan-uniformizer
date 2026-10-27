@@ -1,0 +1,160 @@
+SCAN UNIFORMIZER
+Adaptive local contrast equalization for scanned images
+
+PURPOSE
+
+Bring faint passages up to the tone of existing good ink. Keep already-dark
+passages unchanged. This version removes the global gamma and fixed black
+level controls from versions 1 and 2.
+
+It always saves RGB color TIFFs. Paper tint and ink hue are retained. The
+program changes brightness only where its local measurements identify a
+faint region. Matching regions are copied without changing their pixels.
+
+GET STARTED
+
+1. Unzip this package. Keep the contents together.
+2. Close older Uniformizer windows. Open Start Scan Uniformizer.command.
+   The new window must say Scan Uniformizer.
+3. Choose the ORIGINAL scans or a folder of originals.
+4. Keep Match tolerance at 6% and Matching amount at 100% initially.
+5. Click Preview first page. Click a passage to inspect it at actual pixels.
+   Enable Highlight changed pixels to see where adjustments are being made.
+   Whole page restores the overview. Threshold view is a diagnostic only.
+6. Choose an output folder and click Normalize batch.
+7. Import the resulting color TIFFs into ScanTailor. Check both good and
+   faint passages with your actual ScanTailor settings before running a book.
+
+TWO REFERENCE OPTIONS
+
+Automatic, within each page:
+Leave Optional good-passage image blank. The program estimates good ink from
+stronger printed regions on that page. It uses a robust upper quartile of
+local ink measurements rather than the single darkest pixel or a preset
+black value. This is appropriate when each page contains some good passages.
+
+One shared reference for a whole batch:
+Choose an image of a passage whose darkness is already correct. The same
+reference is then used for every page. Use a crop from a representative good scan. Use a reference from the same book and preferably the same scan scale.
+This option is necessary when entire pages are faint and have no good ink
+within them to use as an automatic reference.
+
+Neither mode lightens areas that are already darker than the reference.
+
+THE TWO CONTROLS
+
+Match tolerance (%), default 6:
+Regions whose ink contrast is within 6% of the reference, or stronger, are
+left unchanged. Corrections begin smoothly outside that tolerance. Increase
+this value to protect more regions; reduce it if subtle fading is missed.
+This is an ink-contrast difference, not a percentage of the page's area.
+
+Matching amount (%), default 100:
+100 means move eligible faint regions toward the measured reference.
+50 applies half that adjustment. 0 changes nothing. It does not make the
+entire page darker, and it cannot intentionally push faint ink beyond the
+measured reference. No global gamma control is applied.
+
+HOW IT WORKS
+
+The program estimates the local paper brightness, dark ink tones, and
+horizontal stroke tones. It compares those measurements with good ink.
+Only regions that are measurably weaker receive correction. Matching both
+stroke tones and notehead tones helps strengthen pale staff lines without
+simply darkening every note on the page.
+
+Within an eligible region, pixels already as dark as the reference remain
+unchanged, and paper-only pixels remain unchanged. Corrections blend smoothly
+at regional boundaries. The same multiplier is applied to R, G, and B at
+each adjusted pixel, retaining channel ratios up to 8-bit rounding.
+
+There is no thresholding, resampling, sharpening, dilation of the notation,
+generative reconstruction, or music recognition. Morphology is used only
+on temporary measurement maps; it is never applied to the output notation.
+
+FILES AND BATCH BEHAVIOR
+
+Output is losslessly compressed 24-bit RGB TIFF. Original files are untouched.
+Pixel dimensions are retained except for applying stored orientation.
+Existing RGB ICC profiles and per-page DPI metadata are retained. Other
+camera/EXIF metadata is not copied. Transparency is composited onto white.
+
+The suggested folder is output_uniformized. Files end in _equalized.tif.
+Multipage TIFFs become separate files ending in _equalized_p0001.tif, etc.
+Existing outputs are skipped. To try other settings, choose a NEW output
+folder. Version 1 and 2 outputs have different names and will not be reused.
+Folder discovery skips names produced by previous Uniformizer versions and
+excludes the selected output directory. Subfolder structure is preserved.
+
+Progress and warnings appear in the program window. No external batch report
+is created. Failed inputs are logged and the batch continues. Stop waits for
+the current calculation and preserves completed output files.
+No scans are uploaded; processing is local.
+
+DPI override: leave blank to preserve source metadata, or enter the true scan
+DPI if known. This changes metadata only. If source resolution is missing or
+implausible, use the actual scan resolution in ScanTailor or this field.
+
+REQUIREMENTS
+
+Python 3.10+ with Tk, NumPy, Pillow, and OpenCV. The Mac launcher finds a
+compatible Python. If libraries are missing, it installs requirements.txt
+into a .venv inside this program folder. Internet is needed for that first
+setup only. macOS Python installers from python.org include Tk.
+The program folder must be writable. The Python code is cross-platform;
+the clickable launcher is for macOS. Linux may need python3-tk.
+
+Supported inputs: TIFF (including multiple pages), PNG, JPEG, BMP, WebP,
+8-bit grayscale/color, and 16-bit grayscale converted to 8-bit RGB output.
+Not PDF, RAW, 32-bit/floating-point scans, or already binary images.
+Large images need proportionally more memory; pages are processed serially.
+
+LIMITS
+
+Automatic reference selection is an estimate. It cannot know whether a
+naturally lighter pencil mark, different print style, or faded ink was
+intentional. Mixed artwork, dark scanner borders, show-through, and very
+sparse notation can confuse it. Use the change highlighting and a known-good
+reference passage when needed. Crop heavy scanner borders beforehand.
+
+A uniformly faint page with no reference image is conservatively left alone:
+the program has no evidence of how dark that book should be. Choose a shared
+good reference to normalize such pages across a batch.
+
+Levels cannot restore ink already removed by thresholding or lost to blur.
+A common ScanTailor threshold is the intended benefit, not a guarantee for
+every source or configuration. No corrected score is included in this package.
+
+COMMAND LINE
+
+From this program folder:
+
+  python3 scan_uniformizer.py "/path/to/originals" -o "/path/to/output_uniformized"
+
+Use one good passage across the batch:
+
+  python3 scan_uniformizer.py "/path/to/originals" -o "/path/to/output_uniformized" --reference "/path/to/good passage.png" --recursive
+
+Optional settings:
+  --tolerance .06    Leave regions within 6% of good ink unchanged.
+  --strength 1      Matching amount, 0 to 1. Default 1.
+  --region-size 0   Automatic; otherwise local window size in source pixels.
+  --max-gain 3      Limit weak-detail amplification.
+  --dpi 300         Set the KNOWN scan DPI without resampling.
+
+Automatic window width is approximately page width / 12, at least 96 pixels.
+Smaller windows follow local changes more closely but can overreact to sparse
+notation; larger windows may miss a small faint passage.
+
+VALIDATION
+
+  python3 -m unittest discover -s tests -v
+
+Tests explicitly check that good regions stay pixel-for-pixel unchanged,
+faint regions approach the good reference, already-dark marks inside faint
+regions stay unchanged, and a uniform page is an exact identity operation.
+Additional tests cover shared-reference batch matching, weak staff lines,
+blank paper, color ratios, RGB/ICC round trips, multipage TIFFs, DPI, restart
+skipping, original-file preservation, corrupt inputs, and stopping.
+
+Source code is in scan_uniformizer.py for inspection and modification.
