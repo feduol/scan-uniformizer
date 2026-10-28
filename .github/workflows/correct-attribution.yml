@@ -1,0 +1,50 @@
+name: Correct owner-directed automation attribution
+on:
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  correct:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+      - name: Verify the expected history and save a backup
+        run: |
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          git merge-base --is-ancestor 7b5d4a888d0019211483cbc55cc1083e49565c3a HEAD
+          test "$(git show -s --format=%ae 7b5d4a888d0019211483cbc55cc1083e49565c3a)" = '41898282+github-actions[bot]@users.noreply.github.com'
+          git bundle create before-attribution-correction.bundle --all
+          git rev-parse HEAD > before-head.txt
+          git rev-parse 'HEAD^{tree}' > before-tree.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: repository-before-attribution-correction
+          path: before-attribution-correction.bundle
+          retention-days: 30
+      - name: Correct the bot author and committer on main only
+        env:
+          FILTER_BRANCH_SQUELCH_WARNING: '1'
+        run: |
+          git filter-branch --env-filter '
+          if [ "$GIT_AUTHOR_EMAIL" = "41898282+github-actions[bot]@users.noreply.github.com" ]; then
+            export GIT_AUTHOR_NAME="Fernando Duarte de Oliveira"
+            export GIT_AUTHOR_EMAIL="feduol@gmail.com"
+          fi
+          if [ "$GIT_COMMITTER_EMAIL" = "41898282+github-actions[bot]@users.noreply.github.com" ]; then
+            export GIT_COMMITTER_NAME="Fernando Duarte de Oliveira"
+            export GIT_COMMITTER_EMAIL="feduol@gmail.com"
+          fi
+          ' -- '7b5d4a888d0019211483cbc55cc1083e49565c3a^..main'
+          test "$(git rev-parse 'main^{tree}')" = "$(cat before-tree.txt)"
+          python3 - <<'PY'
+          import subprocess
+          history = subprocess.check_output(['git', 'log', '--format=%an <%ae> / %cn <%ce>', 'main'], text=True)
+          assert 'github-actions[bot]' not in history
+          PY
+      - name: Update main only if no one has pushed since this run began
+        run: |
+          before=$(cat before-head.txt)
+          git push --force-with-lease="refs/heads/main:$before" origin main:main
