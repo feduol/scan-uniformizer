@@ -6,6 +6,8 @@ Scan Uniformizer is a local desktop and command-line tool for adaptive local con
 
 ## Download
 
+**Standalone apps (no Python installation):** see [standalone downloads and instructions](STANDALONE.md) for macOS, Windows, and Linux. The Python program and original download below remain available.
+
 Download **Scan-Uniformizer-v1.0.0.zip** from the [latest release](https://github.com/feduol/scan-uniformizer/releases/latest), then unzip it.
 
 The package includes the Python program and a macOS launcher. It is not a standalone compiled application; Python is required.
