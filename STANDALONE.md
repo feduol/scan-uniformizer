@@ -4,7 +4,7 @@ The Python program, its source launcher, and `Scan-Uniformizer-v1.0.0.zip` remai
 
 ## Downloads and use
 
-Get the archive for your computer from the [release page](https://github.com/feduol/scan-uniformizer/releases/tag/v1.0.0).
+Get the archive for your computer from the [latest release](https://github.com/feduol/scan-uniformizer/releases/latest). Version 1.0.1 introduces the approved Scan Uniformizer logo in the app bundle/executable and application windows. Image processing is unchanged.
 
 | Download suffix | Computer | Launch |
 | --- | --- | --- |
@@ -33,12 +33,12 @@ python build_standalone.py
 
 Linux needs Tcl/Tk and a display; in headless CI, run `xvfb-run -a python build_standalone.py`. The GitHub Actions workflow installs the required Linux system packages.
 
-The build script creates archives and SHA-256 checksums in `dist-standalone/`. It includes license notices and a `BUILD INFO.txt` with the source hash and dependency versions. The standalone launcher is separate (`standalone_entry.py`); `scan_uniformizer.py` remains the source/CLI entry point.
+The build script creates archives and SHA-256 checksums in `dist-standalone/`. It includes license notices and a `BUILD INFO.txt` with the source hash and dependency versions. The standalone launcher is separate (`standalone_entry.py`); `scan_uniformizer.py` remains the source/CLI entry point. To use the branded window from Python, run `python standalone_entry.py --gui` with `scan-uniformizer.png` alongside it. The approved artwork is preserved in this PNG; PyInstaller converts it into native macOS and Windows icon formats during each build. Linux uses the same PNG for the application window and includes a copy for desktop-launcher customization.
 
 Before packaging, the actual frozen executable runs `--self-test <temporary-result-file>`. This checks bundled Tcl/Tk, Pillow ImageTk, OpenCV/NumPy, faint-region correction, unchanged good regions, RGB/ICC/DPI preservation, multipage TIFF output, input preservation, and common image codecs. It runs with Python environment variables removed and a system-only PATH. The original 11 tests also run on every CI platform. These checks do not replace interactive testing on every supported OS version.
 
 ## GitHub build workflow
 
-Under Actions, choose **Build standalone applications** → **Run workflow**. With publishing unchecked, all four builds are available as workflow artifacts. With publishing checked, successful builds append assets to the selected existing release only after all four build jobs pass. Existing asset names are never overwritten; the original Python ZIP is preserved. The default release is `v1.0.0`.
+Under Actions, choose **Build standalone applications** → **Run workflow**. With publishing unchecked, all four builds are available as workflow artifacts. With publishing checked, successful builds append assets to the selected existing release only after all four build jobs pass. Existing asset names are never overwritten; the original Python ZIP is preserved. The default release is `v1.0.1`.
 
 Build output and caches are not part of the Python source distribution.

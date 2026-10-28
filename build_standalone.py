@@ -15,7 +15,7 @@ import tempfile
 import zipfile
 
 ROOT = Path(__file__).resolve().parent
-VERSION = '1.0.0'
+VERSION = '1.0.1'
 NAME = 'Scan Uniformizer'
 
 
@@ -98,10 +98,13 @@ def main():
     command = [sys.executable, '-m', 'PyInstaller', '--noconfirm', '--clean', '--onedir', '--windowed',
                '--name', NAME, '--distpath', str(build/'dist'), '--workpath', str(build/'work'),
                '--specpath', str(build), '--add-data', f'{ROOT / "LICENSE"}:.',
+               '--add-data', f'{ROOT / "scan-uniformizer.png"}:.',
                '--add-data', f'{license_dir}:licenses', '--hidden-import', 'PIL.ImageTk',
                '--hidden-import', 'PIL.ImageCms', '--hidden-import', 'PIL._tkinter_finder',
                '--exclude-module', 'pytest',
                '--exclude-module', 'matplotlib', '--exclude-module', 'IPython']
+    if sys.platform in ('darwin', 'win32'):
+        command += ['--icon', str(ROOT/'scan-uniformizer.png')]
     if sys.platform == 'darwin':
         command += ['--osx-bundle-identifier', 'io.github.feduol.scan-uniformizer', '--target-arch', machine]
     command += [str(ROOT/'standalone_entry.py')]
@@ -112,6 +115,9 @@ def main():
         import plistlib
         info_file = bundle/'Contents'/'Info.plist'
         info = plistlib.loads(info_file.read_bytes())
+        icon_file = bundle/'Contents'/'Resources'/info['CFBundleIconFile']
+        if icon_file.stem == 'icon-windowed' or not icon_file.is_file():
+            raise RuntimeError('Custom macOS app icon is missing')
         info.update(CFBundleShortVersionString=VERSION, CFBundleVersion=VERSION, NSHighResolutionCapable=True,
                     LSMinimumSystemVersion='14.0' if machine == 'arm64' else '13.0')
         info_file.write_bytes(plistlib.dumps(info))
@@ -124,6 +130,7 @@ def main():
     package.mkdir()
     shutil.copytree(bundle, package/bundle.name, symlinks=True)
     shutil.copy2(ROOT/'LICENSE', package/'LICENSE')
+    shutil.copy2(ROOT/'scan-uniformizer.png', package/'scan-uniformizer.png')
     shutil.copytree(license_dir, package/'Third-party licenses')
     instructions = 'Scan Uniformizer — standalone application\n\nNo Python installation is needed. Processing stays on your computer.\n\n'
     if sys.platform == 'darwin':

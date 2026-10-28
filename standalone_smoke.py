@@ -15,6 +15,7 @@ def smoke_test():
     root = tk.Tk()
     root.withdraw()
     try:
+        assert root._scan_icon.width() == 256, 'Bundled app logo was not loaded'
         ttk.Label(root, text='Scan Uniformizer packaging check').pack()
         photo = ImageTk.PhotoImage(Image.new('RGB', (16, 16), 'white'), master=root)
         assert photo.width() == 16
