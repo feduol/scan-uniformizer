@@ -1,0 +1,35 @@
+name: Apply approved logo update
+on:
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  apply:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - name: Verify and restore the approved files
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import base64, hashlib, json
+          expected = {'scan-uniformizer.png', 'build_standalone.py', 'standalone_entry.py', 'standalone_smoke.py', 'README.md', 'STANDALONE.md'}
+          source = ''.join(Path(f'logo-transfer-{i}.txt').read_text().strip() for i in range(1, 4))
+          files = json.loads(source)
+          assert set(files) == expected
+          for name, entry in files.items():
+              data = base64.b64decode(entry['base64'], validate=True)
+              assert hashlib.sha256(data).hexdigest() == entry['sha256'], name
+              Path(name).write_bytes(data)
+          assert hashlib.sha256(Path('scan_uniformizer.py').read_bytes()).hexdigest() == 'b4cbfec63e5a9b000c8c6d2b191da95924ef7241421c60129c04d917bec6bda6'
+          PY
+      - name: Commit app branding and remove temporary transfer files
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add scan-uniformizer.png build_standalone.py standalone_entry.py standalone_smoke.py README.md STANDALONE.md
+          git rm logo-transfer-1.txt logo-transfer-2.txt logo-transfer-3.txt
+          git commit -m 'Apply approved Scan Uniformizer logo to apps and documentation'
+          git push origin HEAD:main
