@@ -7,6 +7,10 @@ on:
         description: Append standalone downloads to the existing release (keeps the Python ZIP)
         type: boolean
         default: false
+      python_only:
+        description: Package only the Python source ZIP (skip standalone builds)
+        type: boolean
+        default: false
       release_tag:
         description: Existing release tag to receive the additional downloads
         type: string
@@ -18,6 +22,7 @@ permissions:
 jobs:
   build:
     name: Build and test ${{ matrix.platform }}
+    if: ${{ !inputs.python_only }}
     strategy:
       fail-fast: false
       matrix:
@@ -59,14 +64,45 @@ jobs:
           retention-days: 30
 
   publish:
-    name: Add downloads without replacing the Python release
-    if: ${{ inputs.publish }}
+    name: Add downloads without replacing existing assets
+    if: ${{ always() && inputs.publish && (needs.build.result == 'success' || (inputs.python_only && needs.build.result == 'skipped')) }}
     needs: build
     runs-on: ubuntu-22.04
     permissions:
       contents: write
     steps:
+      - uses: actions/checkout@v4
+        if: inputs.python_only
+      - name: Package Python source
+        if: inputs.python_only
+        env:
+          RELEASE_TAG: ${{ inputs.release_tag }}
+        run: |
+          python3 - <<'PYTHON'
+          from pathlib import Path
+          import hashlib, os, re, zipfile
+          tag = os.environ['RELEASE_TAG']
+          assert re.fullmatch(r'v[0-9]+\.[0-9]+\.[0-9]+', tag), 'Expected a version tag'
+          files = ['.gitignore', 'LICENSE', 'READ ME.txt', 'README.md',
+                   'Start Scan Uniformizer.command', 'requirements.txt', 'scan_uniformizer.py',
+                   'tests/test_uniformizer.py', 'scan-uniformizer.png', 'STANDALONE.md',
+                   'standalone_entry.py', 'standalone_smoke.py', 'build_standalone.py',
+                   'requirements-build.txt', 'TCL-TK-LICENSES.txt']
+          Path('downloads').mkdir(exist_ok=True)
+          archive = Path('downloads') / f'Scan-Uniformizer-{tag}.zip'
+          with zipfile.ZipFile(archive, 'w', compression=zipfile.ZIP_DEFLATED) as z:
+              for name in files:
+                  z.write(name, 'Scan Uniformizer/' + name)
+          with zipfile.ZipFile(archive) as z:
+              assert z.testzip() is None
+              assert z.read('Scan Uniformizer/scan_uniformizer.py') == Path('scan_uniformizer.py').read_bytes()
+              assert z.read('Scan Uniformizer/scan-uniformizer.png') == Path('scan-uniformizer.png').read_bytes()
+          digest = hashlib.sha256(archive.read_bytes()).hexdigest()
+          archive.with_suffix('.zip.sha256').write_text(f'{digest}  {archive.name}\n')
+          print(f'Verified Python package: {archive.name}')
+          PYTHON
       - uses: actions/download-artifact@v4
+        if: ${{ !inputs.python_only }}
         with:
           path: downloads
           merge-multiple: true
