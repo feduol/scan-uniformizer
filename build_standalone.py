@@ -99,7 +99,8 @@ def main():
                '--name', NAME, '--distpath', str(build/'dist'), '--workpath', str(build/'work'),
                '--specpath', str(build), '--add-data', f'{ROOT / "LICENSE"}:.',
                '--add-data', f'{license_dir}:licenses', '--hidden-import', 'PIL.ImageTk',
-               '--hidden-import', 'PIL.ImageCms', '--exclude-module', 'pytest',
+               '--hidden-import', 'PIL.ImageCms', '--hidden-import', 'PIL._tkinter_finder',
+               '--exclude-module', 'pytest',
                '--exclude-module', 'matplotlib', '--exclude-module', 'IPython']
     if sys.platform == 'darwin':
         command += ['--osx-bundle-identifier', 'io.github.feduol.scan-uniformizer', '--target-arch', machine]
