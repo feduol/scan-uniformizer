@@ -4,3 +4,6 @@ __pycache__/
 .DS_Store
 .pytest_cache/
 output_uniformized/
+.venv-build/
+build/
+dist-standalone/
