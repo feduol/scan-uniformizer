@@ -1,6 +1,6 @@
 # Standalone applications
 
-The Python program, its source launcher, and `Scan-Uniformizer-v1.0.0.zip` remain available unchanged. Standalone applications are **additional downloads**. They include Python, Tcl/Tk, NumPy, Pillow, and OpenCV; end users do not install Python or run pip.
+The Python program and its source launcher are available in `Scan-Uniformizer-v1.0.1.zip`. The original `Scan-Uniformizer-v1.0.0.zip` remains available unchanged in the v1.0.0 release. Standalone applications are **additional downloads**. They include Python, Tcl/Tk, NumPy, Pillow, and OpenCV; end users do not install Python or run pip.
 
 ## Downloads and use
 
@@ -42,3 +42,5 @@ Before packaging, the actual frozen executable runs `--self-test <temporary-resu
 Under Actions, choose **Build standalone applications** → **Run workflow**. With publishing unchecked, all four builds are available as workflow artifacts. With publishing checked, successful builds append assets to the selected existing release only after all four build jobs pass. Existing asset names are never overwritten; the original Python ZIP is preserved. The default release is `v1.0.1`.
 
 Build output and caches are not part of the Python source distribution.
+
+To publish only the Python source package, enable **Package only the Python source ZIP** and the publishing checkbox. This skips standalone builds and adds the versioned Python ZIP and checksum to the selected release. Existing assets are never overwritten.
