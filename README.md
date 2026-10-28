@@ -1,156 +1,117 @@
-#!/usr/bin/env python3
-"""Build and verify a standalone app on the current operating system."""
-import argparse
-import hashlib
-from importlib.metadata import distribution
-import os
-from pathlib import Path
-import platform
-import shutil
-import subprocess
-import sys
-import sysconfig
-import tarfile
-import tempfile
-import zipfile
+# Scan Uniformizer
 
-ROOT = Path(__file__).resolve().parent
-VERSION = '1.0.0'
-NAME = 'Scan Uniformizer'
+**Adaptive local contrast equalization for scanned images**
 
+Scan Uniformizer is a local desktop and command-line tool for adaptive local contrast normalization in scanned images. It selectively adjusts low-contrast regions to match reference ink levels, while preserving regions that already meet or exceed the reference contrast.
 
-def run(*args, **kwargs):
-    subprocess.run([str(a) for a in args], check=True, **kwargs)
+## Download
 
+**Standalone apps (no Python installation):** see [standalone downloads and instructions](STANDALONE.md) for macOS, Windows, and Linux. The Python program and original download below remain available.
 
-def collect_licenses(destination):
-    destination.mkdir(parents=True)
-    for name in ('numpy', 'Pillow', 'opencv-python-headless', 'pyinstaller'):
-        dist = distribution(name)
-        for file in dist.files or []:
-            if any(token in Path(file).name.lower() for token in ('license', 'copying')) and '.dist-info/' in str(file):
-                source = Path(dist.locate_file(file))
-                if source.is_file():
-                    target = destination/name/Path(file).name
-                    target.parent.mkdir(exist_ok=True)
-                    shutil.copy2(source, target)
-    python_license = Path(sysconfig.get_path('stdlib'))/'LICENSE.txt'
-    if not python_license.exists():
-        python_license = Path(sys.base_prefix)/'LICENSE.txt'
-    if not python_license.exists():
-        raise RuntimeError('Python license not found')
-    shutil.copy2(python_license, destination/'Python-LICENSE.txt')
-    # Tcl/Tk packages differ by OS; include the installed license notices.
-    import tkinter
-    tcl = Path(tkinter.Tcl().eval('info library'))
-    for package in ('tcl', 'tk'):
-        candidates = [tcl/'license.terms', tcl.parent/f'{package}8.6'/'license.terms'] if package == 'tcl' else [tcl.parent/'tk8.6'/'license.terms']
-        candidates += [Path(sys.base_prefix)/'tcl'/f'{package}8.6'/'license.terms',
-                       Path('/usr/share/doc')/f'{package}8.6'/'copyright']
-        framework = 'Tcl' if package == 'tcl' else 'Tk'
-        candidates += list((Path(sys.base_prefix)/'Frameworks'/f'{framework}.framework').glob('Versions/*/Resources/license.terms'))
-        found = next((p for p in candidates if p.is_file()), None)
-        if not found and tkinter.TclVersion == 8.6 and tkinter.TkVersion == 8.6:
-            found = ROOT/'TCL-TK-LICENSES.txt'
-        if not found or not found.is_file():
-            raise RuntimeError(f'{framework} license not found; add this platform license path')
-        shutil.copy2(found, destination/f'{framework}-LICENSE.txt')
+Download **Scan-Uniformizer-v1.0.0.zip** from the [latest release](https://github.com/feduol/scan-uniformizer/releases/latest), then unzip it.
 
+The package includes the Python program and a macOS launcher. It is not a standalone compiled application; Python is required.
 
-def test_bundle(executable):
-    with tempfile.TemporaryDirectory(prefix='scan-uniformizer-check-') as directory:
-        result = Path(directory)/'result.txt'
-        env = os.environ.copy()
-        for key in ('PYTHONHOME', 'PYTHONPATH', 'VIRTUAL_ENV', 'TCL_LIBRARY', 'TK_LIBRARY'):
-            env.pop(key, None)
-        env['PYTHONNOUSERSITE'] = '1'
-        env['PATH'] = str(Path(os.environ.get('SystemRoot', r'C:\Windows'))/'System32') if sys.platform == 'win32' else '/usr/bin:/bin'
-        process = subprocess.run([str(executable), '--self-test', str(result)], env=env, cwd=directory, timeout=120)
-        if process.returncode or not result.exists() or result.read_text(encoding='utf-8').strip() != 'PASS':
-            raise RuntimeError(result.read_text(encoding='utf-8') if result.exists() else 'Frozen self-test did not complete')
-    print('Packaged application passed GUI, color normalization, multipage TIFF, metadata and codec checks.', flush=True)
+## Features
 
+- Selective local correction, with an automatic reference from each page or one good reference image for an entire batch.
+- RGB TIFF output that retains paper tint and ink hues.
+- Batch processing of individual images, folders, subfolders, and multipage TIFFs.
+- Side-by-side preview, actual-pixel inspection, changed-pixel highlighting, and a same-threshold diagnostic view.
+- Original files remain untouched. Matching regions and already-dark pixels are protected.
+- Existing outputs are skipped. Progress and warnings appear in the window; no JSON batch report is created.
+- Processing runs locally; scans are not uploaded.
 
-def main():
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--output', type=Path, default=ROOT/'dist-standalone')
-    args = parser.parse_args()
-    output = args.output.resolve()
-    output.mkdir(parents=True, exist_ok=True)
-    machine = platform.machine().lower()
-    if sys.platform == 'darwin':
-        label = 'macOS-Apple-Silicon' if machine in ('arm64', 'aarch64') else 'macOS-Intel'
-    elif sys.platform == 'win32':
-        label = 'Windows-x64' if machine in ('amd64', 'x86_64') else f'Windows-{machine}'
-    elif sys.platform.startswith('linux'):
-        label = 'Linux-x64' if machine in ('amd64', 'x86_64') else f'Linux-{machine}'
-    else:
-        raise RuntimeError('Unsupported build OS')
-    build = ROOT/'build'/'standalone'/label
-    # PyInstaller owns this build directory; completed release downloads live elsewhere.
-    build.mkdir(parents=True, exist_ok=True)
-    license_dir = build/'licenses'
-    if license_dir.exists():
-        shutil.rmtree(license_dir)
-    collect_licenses(license_dir)
-    env = os.environ.copy()
-    env['PYINSTALLER_CONFIG_DIR'] = str(build/'cache')
-    command = [sys.executable, '-m', 'PyInstaller', '--noconfirm', '--clean', '--onedir', '--windowed',
-               '--name', NAME, '--distpath', str(build/'dist'), '--workpath', str(build/'work'),
-               '--specpath', str(build), '--add-data', f'{ROOT / "LICENSE"}:.',
-               '--add-data', f'{license_dir}:licenses', '--hidden-import', 'PIL.ImageTk',
-               '--hidden-import', 'PIL.ImageCms', '--hidden-import', 'PIL._tkinter_finder',
-               '--exclude-module', 'pytest',
-               '--exclude-module', 'matplotlib', '--exclude-module', 'IPython']
-    if sys.platform == 'darwin':
-        command += ['--osx-bundle-identifier', 'io.github.feduol.scan-uniformizer', '--target-arch', machine]
-    command += [str(ROOT/'standalone_entry.py')]
-    run(*command, env=env, cwd=ROOT)
-    bundle = build/'dist'/(NAME+'.app' if sys.platform == 'darwin' else NAME)
-    executable = bundle/'Contents'/'MacOS'/NAME if sys.platform == 'darwin' else bundle/(NAME+'.exe' if sys.platform == 'win32' else NAME)
-    if sys.platform == 'darwin':
-        import plistlib
-        info_file = bundle/'Contents'/'Info.plist'
-        info = plistlib.loads(info_file.read_bytes())
-        info.update(CFBundleShortVersionString=VERSION, CFBundleVersion=VERSION, NSHighResolutionCapable=True,
-                    LSMinimumSystemVersion='14.0' if machine == 'arm64' else '13.0')
-        info_file.write_bytes(plistlib.dumps(info))
-        run('codesign', '--force', '--deep', '--sign', '-', bundle)
-        run('codesign', '--verify', '--deep', '--strict', bundle)
-    test_bundle(executable)
-    package = build/f'Scan-Uniformizer-v{VERSION}-{label}'
-    if package.exists():
-        shutil.rmtree(package)
-    package.mkdir()
-    shutil.copytree(bundle, package/bundle.name, symlinks=True)
-    shutil.copy2(ROOT/'LICENSE', package/'LICENSE')
-    shutil.copytree(license_dir, package/'Third-party licenses')
-    instructions = 'Scan Uniformizer — standalone application\n\nNo Python installation is needed. Processing stays on your computer.\n\n'
-    if sys.platform == 'darwin':
-        instructions += 'Drag Scan Uniformizer.app to Applications, then open it.\nThis build is ad-hoc signed, not Apple Developer ID signed or notarized.\nmacOS may block an internet download until you approve it in System Settings > Privacy & Security.\nOnly approve an app you trust; do not disable Gatekeeper.\n'
-    elif sys.platform == 'win32':
-        instructions += 'Extract the entire ZIP into a folder, then open Scan Uniformizer.exe inside Scan Uniformizer.\nKeep the _internal folder beside the executable. No installation or administrator account is needed.\nThis build is not publisher-signed; Windows may show an unknown-publisher warning.\n'
-    else:
-        instructions += 'Extract the archive, then open the Scan Uniformizer executable inside its folder.\nKeep the _internal folder beside the executable. A graphical desktop is required.\nBuilt on Ubuntu 22.04 (glibc 2.35); other distributions are not individually tested.\nIf the file manager does not launch executables, run ./"Scan Uniformizer" from that folder.\n'
-    instructions += '\nChoose images or a folder, preview the result, then select Normalize batch.\nOutput: RGB TIFF files in output_uniformized with _equalized filenames.\n\nThe Python source and original Python ZIP remain available at:\nhttps://github.com/feduol/scan-uniformizer\n'
-    (package/'START HERE.txt').write_text(instructions, encoding='utf-8')
-    details = f'Version: {VERSION}\nPlatform: {label}\nBuild OS: {platform.platform()}\nPython: {platform.python_version()}\n'
-    details += f'Source SHA256: {hashlib.sha256((ROOT/"scan_uniformizer.py").read_bytes()).hexdigest()}\n'
-    details += '\n'.join(f'{p}: {distribution(p).version}' for p in ('numpy', 'Pillow', 'opencv-python-headless', 'pyinstaller'))+'\n'
-    (package/'BUILD INFO.txt').write_text(details, encoding='utf-8')
-    if sys.platform == 'darwin':
-        archive = output/(package.name+'.zip')
-        run('ditto', '-c', '-k', '--sequesterRsrc', '--keepParent', package, archive)
-    elif sys.platform == 'win32':
-        archive = Path(shutil.make_archive(str(output/package.name), 'zip', build, package.name))
-    else:
-        archive = output/(package.name+'.tar.gz')
-        with tarfile.open(archive, 'w:gz') as tar:
-            tar.add(package, arcname=package.name)
-    digest = hashlib.sha256(archive.read_bytes()).hexdigest()
-    archive.with_name(archive.name+'.sha256').write_text(f'{digest}  {archive.name}\n', encoding='utf-8')
-    print(f'Created {archive}', flush=True)
+## Requirements
 
+- Python 3.10 or newer, with Tkinter for the desktop interface.
+- NumPy, Pillow, and OpenCV (listed in `requirements.txt`).
+- The clickable launcher is for macOS. The Python program can also be run on Windows and Linux; those platforms have not been interactively tested for this release.
 
-if __name__ == '__main__':
-    main()
+## Quick start on macOS
+
+1. Unzip the release into a writable folder.
+2. Double-click **Start Scan Uniformizer.command**.
+3. If Python is missing, install Python with Tk support, then reopen the launcher. Standard macOS installers from [python.org](https://www.python.org/downloads/macos/) include Tk.
+4. The launcher uses existing image libraries when available. Otherwise, it creates a `.venv` inside the program folder and installs the requirements. That first setup needs internet access; image processing does not.
+5. Choose original scans or a folder. Start with **6% match tolerance** and **100% matching amount**.
+6. Use **Preview first page** and **Highlight changed pixels** to check the proposed adjustments.
+7. Click **Normalize batch**. The default output folder is `output_uniformized`.
+8. Import the TIFFs into ScanTailor and check representative good and faint passages with your actual threshold settings.
+
+If launching from source and executable permissions were not retained, run `bash "Start Scan Uniformizer.command"` from the project folder.
+
+## Matching controls
+
+**Match tolerance** controls how much difference is left alone. At 6%, regions whose measured ink contrast is within 6% of the reference, or stronger, remain unchanged. Higher tolerance protects more regions.
+
+**Matching amount** controls how far eligible faint regions move toward the measured reference. 100% applies the full match; 50% applies half; 0% makes no changes. It is not a global darkening adjustment.
+
+**Optional good-passage image** supplies one shared reference for the batch. Leave it blank to use stronger ink within each page. If an entire page is faint, choose a known-good passage from the same book, preferably at the same scan scale.
+
+**DPI override** changes resolution metadata only. Leave it blank to retain source metadata, or enter the true scan DPI if known.
+
+## Input and output
+
+Supported inputs: TIFF (including multipage TIFF), PNG, JPEG, BMP, and WebP. The program accepts 8-bit color/grayscale and converts 16-bit grayscale to 8-bit RGB output. It does not accept PDF, RAW, 32-bit/floating-point images, or already binary scans.
+
+Output is losslessly compressed RGB TIFF. For example:
+
+- `page.tif` → `page.tif_equalized.tif`
+- A multipage TIFF → `book.tif_equalized_p0001.tif`, `book.tif_equalized_p0002.tif`, etc.
+
+The original extension is retained in the basename to distinguish inputs such as `page.jpg` and `page.tif`. Existing outputs are skipped, so use a new destination folder when changing settings. Previous Uniformizer output filenames are excluded from folder discovery.
+
+Pixel dimensions are retained except when stored orientation requires rotation. RGB ICC profiles and per-page DPI metadata are retained. Transparency is composited onto white; other camera/EXIF metadata is not copied.
+
+## Command line
+
+Create a virtual environment and install dependencies:
+
+```sh
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install -r requirements.txt
+```
+
+On Windows, activate with `.venv\Scripts\activate` and use your installed Python command. Linux may also require the operating system's `python3-tk` package.
+
+Open the desktop interface:
+
+```sh
+python scan_uniformizer.py --gui
+```
+
+Process a folder:
+
+```sh
+python scan_uniformizer.py "/path/to/originals" -o "/path/to/output_uniformized"
+```
+
+Use a shared reference and include subfolders:
+
+```sh
+python scan_uniformizer.py "/path/to/originals" -o "/path/to/output_uniformized" --reference "/path/to/good passage.png" --recursive
+```
+
+Additional options: `--tolerance .06`, `--strength 1`, `--region-size 0`, `--max-gain 3`, and `--dpi 300` (only when that is the known scan resolution). Run `python scan_uniformizer.py --help` for details.
+
+## How it works and limits
+
+The program measures local paper brightness, dark ink, and horizontal stroke contrast, then matches weaker regions to measured good ink. Its morphology is used only for temporary measurement maps; output notation is not dilated or eroded. There is no generative reconstruction or music recognition.
+
+Automatic detection is an estimate. Pencil marks, different print styles, sparse notation, heavy scanner borders, illustrations, and show-through can affect the measurements. Use the preview and a known-good reference where needed. A uniformly faint page without an external reference is conservatively left alone.
+
+Levels cannot restore strokes already lost to thresholding or blur. The goal is to reduce threshold adjustments in ScanTailor, not to guarantee one perfect threshold for every scan. The threshold preview is a simple diagnostic, not a reproduction of ScanTailor's processing.
+
+## Validation
+
+```sh
+python -m unittest discover -s tests -v
+```
+
+The included tests cover unchanged good regions, matching of faint regions, preservation of dark marks within faint regions, shared-reference matching, weak staff lines, color/profile retention, multipage processing, DPI, skipping completed outputs, original-file preservation, corrupt inputs, and cancellation.
+
+## License
+
+[MIT License](LICENSE).
