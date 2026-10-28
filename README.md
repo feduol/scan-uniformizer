@@ -4,13 +4,13 @@
 
 **Adaptive local contrast equalization for scanned images**
 
-Scan Uniformizer is a local desktop and command-line tool for adaptive local contrast normalization in scanned images. It selectively adjusts low-contrast regions to match reference ink levels, while preserving regions that already meet or exceed the reference contrast.
+Scan Uniformizer is a local desktop and command-line tool for adaptive local contrast normalization in scanned images. It automatically identifies and adjusts low-contrast regions to match reference ink levels while preserving regions that already meet or exceed the reference contrast.
 
 ## Download
 
 **Standalone apps:** see [standalone downloads and instructions](STANDALONE.md) for macOS, Windows, and Linux. The Python program is also available (see bellow).
 
-Download **Scan-Uniformizer-v1.0.0.zip** from the [original Python release](https://github.com/feduol/scan-uniformizer/releases/tag/v1.0.0), then unzip it.
+Download **Scan-Uniformizer-v1.0.1.zip** from the [original Python release](https://github.com/feduol/scan-uniformizer/releases/tag/v1.0.1), then unzip it.
 
 The package includes the Python program and a macOS launcher. It is not a standalone compiled application; Python is required.
 
