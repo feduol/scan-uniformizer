@@ -2,7 +2,7 @@
 
 **Adaptive local contrast equalization for scanned images**
 
-Scan Uniformizer is a local desktop and command-line tool for evening out faded ink in scanned sheet music before processing it in ScanTailor. It selectively brings faint regions closer to existing good ink, while keeping matching dark regions unchanged.
+Scan Uniformizer is a local desktop and command-line tool for adaptive local contrast normalization in scanned images. It selectively adjusts low-contrast regions to match reference ink levels, while preserving regions that already meet or exceed the reference contrast.
 
 ## Download
 
