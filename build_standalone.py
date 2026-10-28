@@ -50,7 +50,9 @@ def collect_licenses(destination):
         framework = 'Tcl' if package == 'tcl' else 'Tk'
         candidates += list((Path(sys.base_prefix)/'Frameworks'/f'{framework}.framework').glob('Versions/*/Resources/license.terms'))
         found = next((p for p in candidates if p.is_file()), None)
-        if not found:
+        if not found and tkinter.TclVersion == 8.6 and tkinter.TkVersion == 8.6:
+            found = ROOT/'TCL-TK-LICENSES.txt'
+        if not found or not found.is_file():
             raise RuntimeError(f'{framework} license not found; add this platform license path')
         shutil.copy2(found, destination/f'{framework}-LICENSE.txt')
 
@@ -63,8 +65,8 @@ def test_bundle(executable):
             env.pop(key, None)
         env['PYTHONNOUSERSITE'] = '1'
         env['PATH'] = str(Path(os.environ.get('SystemRoot', r'C:\Windows'))/'System32') if sys.platform == 'win32' else '/usr/bin:/bin'
-        run(executable, '--self-test', result, env=env, cwd=directory, timeout=120)
-        if not result.exists() or result.read_text(encoding='utf-8').strip() != 'PASS':
+        process = subprocess.run([str(executable), '--self-test', str(result)], env=env, cwd=directory, timeout=120)
+        if process.returncode or not result.exists() or result.read_text(encoding='utf-8').strip() != 'PASS':
             raise RuntimeError(result.read_text(encoding='utf-8') if result.exists() else 'Frozen self-test did not complete')
     print('Packaged application passed GUI, color normalization, multipage TIFF, metadata and codec checks.', flush=True)
 
